@@ -104,14 +104,14 @@ Per-sender replay windows may be tightened org-wide later; v1 uses global ±5 mi
 
 ## 6. HTTP responses (ingest)
 
-| Status | When | Body shape |
-|--------|------|------------|
-| 201 | New envelope accepted | `{ "status": "created", "finding_id", "replay": false }` |
-| 200 | Duplicate nonce | `{ "status": "duplicate", "finding_id", "replay": true }` |
-| 400 | Validation / skew / digest | `{ "error": "<code>", "message": "..." }` — codes in [error-codes.md](error-codes.md) |
-| 401 | Bad signature / unknown kid | `{ "error": "bad_signature" \| "unknown_kid" }` |
-| 413 | Body too large | `{ "error": "payload_too_large" }` |
-| 429 | Rate limit | `{ "error": "rate_limited" }` + `Retry-After` |
+| Status | When | Body example |
+|--------|------|----------------|
+| 201 | New envelope accepted | `{ "status": "created", "finding_id": "fnd_01HXYZ...", "replay": false }` |
+| 200 | Duplicate nonce | `{ "status": "duplicate", "finding_id": "fnd_01HXYZ...", "replay": true }` |
+| 400 | Validation / skew / digest | `{ "error": "clock_skew", "message": "issued_at outside ±5 minute window" }` — codes in [error-codes.md](error-codes.md) |
+| 401 | Bad signature / unknown kid | `{ "error": "bad_signature", "message": "HMAC verification failed" }` or `{ "error": "unknown_kid", "message": "kid not registered for sender" }` |
+| 413 | Body too large | `{ "error": "payload_too_large", "message": "request body exceeds 1048576 bytes" }` |
+| 429 | Rate limit | `{ "error": "rate_limited", "message": "too many requests" }` + `Retry-After` header |
 
 Batch ingest (`POST /api/ng/ingest/batch`): **207** with per-index results (Week 2).
 

@@ -6,15 +6,15 @@
 
 ## 1. Canonical JSON (JCS profile)
 
-NetGuardian v1 uses an **RFC 8785 (JCS) compatible** serialization profile implemented in Python as:
+NetGuardian v1 uses an **RFC 8785 (JCS) compatible** serialization profile:
 
 1. Start from the envelope object **with the `signature` key removed** (never sign the signature).
-2. Recursively sort object keys lexicographically by UTF-16 code units (Python: `sort_keys=True` on `json.dumps`).
-3. Serialize with `separators=(',', ':')`, `ensure_ascii=False`, UTF-8 encode the result.
+2. Recursively sort object keys by **lexicographic comparison of UTF-16 code unit sequences**: convert each key string to UTF-16 code units (including surrogate pairs as individual code units) and compare those sequences. This is **not** the same as Python’s default Unicode code-point ordering used by `json.dumps(..., sort_keys=True)` — keys that differ only in surrogate-pair vs BMP representation can sort differently under JCS vs `sort_keys=True`.
+3. Serialize with `separators=(',', ':')`, `ensure_ascii=False`, UTF-8 encode the result. Reject non-finite numbers (`allow_nan=False` in Python).
 
-This matches Cloudflare Workers / Python stdlib constraints without pulling a native JCS dependency in Week 1. If a future release adopts a certified JCS library, golden-vector tests in `tests/ng/` must still pass.
+Week 1 reference code in `src/ng/canonicalize.py` still uses `sort_keys=True` as a pragmatic interim; golden-vector tests must be updated before claiming full JCS compliance. Prefer a certified JCS implementation or explicit UTF-16 key sort when hardening.
 
-**Reference implementation:** `src/ng/canonicalize.py` → `canonicalize_envelope_for_signing()`.
+**Reference implementation (interim):** `src/ng/canonicalize.py` → `canonicalize_envelope_for_signing()`.
 
 ---
 

@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS envelopes (
   validated_at INTEGER,
   status TEXT NOT NULL DEFAULT 'accepted',
   payload_json TEXT NOT NULL,
-  finding_id TEXT,
   UNIQUE (org_id, sender_id, nonce)
 );
 
@@ -42,10 +41,11 @@ CREATE INDEX IF NOT EXISTS idx_envelopes_org_received
   ON envelopes (org_id, received_at DESC);
 
 -- Triage findings (denormalized from payload_plaintext)
+-- 1:1 with envelopes: each finding links exactly one envelope; each envelope maps to at most one finding.
 CREATE TABLE IF NOT EXISTS findings (
   id TEXT PRIMARY KEY,
   org_id TEXT NOT NULL,
-  envelope_id TEXT,
+  envelope_id TEXT NOT NULL UNIQUE,
   rule_id TEXT NOT NULL,
   severity TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -58,6 +58,11 @@ CREATE TABLE IF NOT EXISTS findings (
   updated_at INTEGER NOT NULL,
   FOREIGN KEY (envelope_id) REFERENCES envelopes(id)
 );
+
+-- Back-link envelope -> finding (column added after findings table exists)
+ALTER TABLE envelopes ADD COLUMN finding_id TEXT REFERENCES findings(id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_envelopes_finding_id
+  ON envelopes (finding_id);
 
 CREATE INDEX IF NOT EXISTS idx_findings_org_status
   ON findings (org_id, status, updated_at DESC);

@@ -88,3 +88,9 @@ def test_tampered_kid_changes_signature(vectors):
 def test_payload_digest_rejects_invalid_modes(kwargs):
     with pytest.raises(ValueError):
         payload_digest_hex(**kwargs)
+
+
+@pytest.mark.parametrize("bad_float", [float("nan"), float("inf"), float("-inf")])
+def test_canonicalize_json_rejects_non_finite(bad_float):
+    with pytest.raises(ValueError):
+        canonicalize_json({"score": bad_float})
