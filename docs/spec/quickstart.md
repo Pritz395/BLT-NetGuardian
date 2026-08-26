@@ -37,7 +37,18 @@ In the app:
 
 Pinned Start/Stop stay at the top; findings/domain lists are capped so the UI stays usable during a long crawl.
 
-## 3. What the crawl does
+## 3. Ask permission (optional, before deeper review)
+
+In the Flutter client:
+
+1. Set seed URL → **Find contacts** (security.txt / page emails / `support@`)
+2. **Ask permission** → creates an invite + Yes/No page
+3. **Open mail draft** (or Copy draft) and send to the site owner
+4. Owner opens the link, chooses **Yes** (accepts terms) or **No**
+
+Consent page: `{api}/permission.html?token=…`
+
+## 4. What the crawl does
 
 ```
 seed → POST /api/domains (submit hosts)

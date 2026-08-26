@@ -46,6 +46,10 @@ In-repo Flutter desktop producer ([`client/`](client/README.md)): distributed do
 | POST | `/api/domains/{id}/heartbeat` | Extend in-progress lease |
 | POST | `/api/domains/{id}/complete` | Record scan result |
 | POST | `/api/domains/{id}/fail` | Fail → retry_required (lease expiry also retries) |
+| POST | `/api/permission/invite` | Create permission-ask invite + email draft |
+| GET | `/api/permission` | List invites for org |
+| GET | `/api/permission/invite/{token}` | Public invite (for Yes/No page) |
+| POST | `/api/permission/invite/{token}/respond` | Site owner Yes/No (+ terms on Yes) |
 
 Storage is **D1** (not KV). Optional R2 binding `EVIDENCE`. Cron `*/5 * * * *` retries pending webhooks.
 

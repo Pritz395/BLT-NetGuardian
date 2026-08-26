@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetGuardian — permission request</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0d0000; --red:#ff2020; --gold:#c9a227; --muted:#888; --ok:#22c55e; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: #eee;
+      font-family: "Share Tech Mono", ui-monospace, monospace;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    main { max-width: 560px; width: 100%; border: 1px solid var(--red); padding: 24px; }
+    h1 { font-family: Orbitron, sans-serif; color: var(--red); letter-spacing: 0.14em; font-size: 0.95rem; margin: 0 0 12px; }
+    p, li { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .domain { color: var(--gold); font-size: 14px; margin-bottom: 16px; }
+    .terms {
+      border: 1px solid #400; background: #1a0000; padding: 12px; max-height: 180px;
+      overflow: auto; font-size: 12px; color: #ccc; margin: 12px 0 16px;
+    }
+    label { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #ccc; margin-bottom: 16px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      font-family: inherit; cursor: pointer; border: 1px solid var(--red);
+      background: transparent; color: #eee; padding: 10px 16px; letter-spacing: 0.08em;
+    }
+    button.yes { border-color: var(--ok); color: var(--ok); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .msg { margin-top: 16px; font-size: 13px; color: var(--gold); }
+    .err { color: var(--red); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PERMISSION REQUEST</h1>
+    <p class="domain" id="domain">Loading…</p>
+    <p>
+      An open-source community researcher using NetGuardian (OWASP BLT) would like
+      permission to take a further look at the security of your website
+      (non-destructive checks such as HTTP security headers).
+    </p>
+    <p><strong style="color:#eee">Would that be OK?</strong></p>
+    <div class="terms" id="terms">Loading terms…</div>
+    <label>
+      <input type="checkbox" id="accept">
+      <span>I am authorized for this domain and agree to the terms above (required for Yes).</span>
+    </label>
+    <div class="row">
+      <button type="button" class="yes" id="yes">YES — grant permission</button>
+      <button type="button" id="no">NO — decline</button>
+    </div>
+    <p class="msg" id="msg"></p>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token') || '';
+    const domainEl = document.getElementById('domain');
+    const termsEl = document.getElementById('terms');
+    const msgEl = document.getElementById('msg');
+    const acceptEl = document.getElementById('accept');
+    const yesBtn = document.getElementById('yes');
+    const noBtn = document.getElementById('no');
+
+    function setMsg(text, isErr) {
+      msgEl.textContent = text;
+      msgEl.className = 'msg' + (isErr ? ' err' : '');
+    }
+
+    async function load() {
+      if (!token) {
+        domainEl.textContent = 'Missing invite token. Open the Yes/No link from the client (Ask permission → Open consent page).';
+        yesBtn.disabled = noBtn.disabled = true;
+        yesBtn.dataset.locked = '1';
+        acceptEl.disabled = true;
+        return;
+      }
+      const res = await fetch('/api/permission/invite/' + encodeURIComponent(token));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        domainEl.textContent = data.message || 'Invite not found.';
+        yesBtn.disabled = noBtn.disabled = true;
+        yesBtn.dataset.locked = '1';
+        acceptEl.disabled = true;
+        return;
+      }
+      domainEl.textContent = data.domain_url || data.host_key || '—';
+      termsEl.textContent = (data.terms && data.terms.text) || '';
+      if (data.status && data.status !== 'pending') {
+        yesBtn.disabled = noBtn.disabled = true;
+        yesBtn.dataset.locked = '1';
+        acceptEl.disabled = true;
+        setMsg('Already recorded: ' + data.status);
+      }
+    }
+
+    async function respond(decision) {
+      if (decision === 'yes' && !acceptEl.checked) {
+        setMsg('Please accept the terms before choosing Yes.', true);
+        return;
+      }
+      yesBtn.disabled = noBtn.disabled = true;
+      const res = await fetch('/api/permission/invite/' + encodeURIComponent(token) + '/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decision,
+          accepted_terms: decision === 'yes' ? true : false,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        yesBtn.disabled = noBtn.disabled = false;
+        setMsg(data.message || 'Could not save response.', true);
+        return;
+      }
+      if (decision === 'yes') {
+        setMsg('Thank you — permission granted. Opening home…');
+        setTimeout(() => { location.href = '/'; }, 900);
+      } else {
+        setMsg('Understood — no further review will be done under this invite.');
+        setTimeout(() => { location.href = '/'; }, 1200);
+      }
+    }
+
+    function syncYesEnabled() {
+      // Yes requires explicit terms acceptance; No does not.
+      if (yesBtn.dataset.locked === '1') return;
+      yesBtn.disabled = !acceptEl.checked;
+    }
+
+    yesBtn.addEventListener('click', () => respond('yes'));
+    noBtn.addEventListener('click', () => respond('no'));
+    acceptEl.addEventListener('change', syncYesEnabled);
+    // Start with Yes disabled until the checkbox is ticked.
+    yesBtn.disabled = true;
+    load().then(() => {
+      if (!yesBtn.disabled && yesBtn.dataset.locked !== '1') syncYesEnabled();
+    });
+  </script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'config/sender_config.dart';
+import 'detect/contact_discover.dart';
 import 'detect/crawl.dart';
 import 'detect/distributed_crawl.dart';
 import 'detect/http_headers.dart';
@@ -12,6 +14,8 @@ import 'ingest/envelope.dart';
 import 'ingest/ingest_client.dart';
 import 'ingest/payload_crypto.dart';
 import 'ingest/redact.dart';
+import 'outreach/permission_api.dart';
+import 'outreach/permission_email.dart';
 import 'queue/domain_queue.dart';
 import 'queue/outbox.dart';
 import 'theme/hud.dart';
@@ -77,6 +81,10 @@ class _HomePageState extends State<HomePage> {
   final Set<String> _selected = {};
   CrawlRun? _crawlRun;
   final _scrollController = ScrollController();
+  List<ContactCandidate> _permissionContacts = [];
+  ContactCandidate? _selectedContact;
+  PermissionInviteResult? _permissionInvite;
+  bool _permissionBusy = false;
   static const _previewCap = 120;
   static const _findingsUiCap = 20;
   static const _jobsUiCap = 12;
@@ -463,6 +471,111 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _discoverPermissionContacts() async {
+    final seed = _scanUrl.text.trim().isEmpty
+        ? 'https://example.com/'
+        : _scanUrl.text.trim();
+    setState(() {
+      _permissionBusy = true;
+      _status = 'Discovering contact emails for $seed…';
+      _permissionContacts = [];
+      _selectedContact = null;
+      _permissionInvite = null;
+    });
+    try {
+      final contacts = await discoverContacts(seed);
+      if (!mounted) return;
+      setState(() {
+        _permissionContacts = contacts;
+        _selectedContact = contacts.isEmpty ? null : contacts.first;
+        _status = contacts.isEmpty
+            ? 'No contacts found — try a different seed URL.'
+            : 'Found ${contacts.length} contact option(s). Pick one, then Ask permission.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = 'Contact discovery failed: $e');
+    } finally {
+      if (mounted) setState(() => _permissionBusy = false);
+    }
+  }
+
+  Future<void> _createPermissionInvite() async {
+    final contact = _selectedContact;
+    if (contact == null) {
+      setState(() => _status = 'Discover contacts first.');
+      return;
+    }
+    final seed = _scanUrl.text.trim().isEmpty
+        ? 'https://example.com/'
+        : _scanUrl.text.trim();
+    setState(() {
+      _permissionBusy = true;
+      _status = 'Creating permission invite…';
+    });
+    try {
+      const localApi = 'http://127.0.0.1:8787';
+      final configured = _baseUrl.text.trim();
+      final base = (configured.contains('127.0.0.1') ||
+              configured.contains('localhost') ||
+              configured.isEmpty)
+          ? localApi
+          : configured;
+      final invite = await createPermissionInvite(
+        baseUrl: base,
+        domain: seed,
+        contactEmail: contact.email,
+        contactSource: contact.source,
+        senderId: _senderId.text.trim().isEmpty
+            ? 'scanner-1'
+            : _senderId.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _permissionInvite = invite;
+        _status =
+            'Invite ready → ${invite.contactEmail}. Open mail or copy the draft.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = 'Permission invite failed: $e');
+    } finally {
+      if (mounted) setState(() => _permissionBusy = false);
+    }
+  }
+
+  Future<void> _openPermissionMailto() async {
+    final invite = _permissionInvite;
+    if (invite == null) return;
+    final draft = buildPermissionEmail(
+      domainUrl: invite.consentUrl.contains('://')
+          ? (_scanUrl.text.trim().isEmpty
+              ? 'https://example.com/'
+              : _scanUrl.text.trim())
+          : 'https://example.com/',
+      contactEmail: invite.contactEmail,
+      consentUrl: invite.consentUrl,
+    );
+    final uri = draft.mailtoUri;
+    final ok = await launchUrl(uri);
+    if (!mounted) return;
+    setState(() {
+      _status = ok
+          ? 'Opened mail draft to ${invite.contactEmail}'
+          : 'Could not open mail client — use Copy draft.';
+    });
+  }
+
+  Future<void> _copyPermissionDraft() async {
+    final invite = _permissionInvite;
+    if (invite == null) return;
+    final text =
+        'To: ${invite.contactEmail}\nSubject: ${invite.subject}\n\n${invite.body}';
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    setState(() => _status = 'Permission email draft copied.');
+  }
+
   void _applyProgress(DistributedProgress p) {
     setState(() {
       _status = p.message;
@@ -766,6 +879,120 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 4),
                       ..._findingsVisible.map(_findingTile),
+                    ],
+                  ]),
+                  const SizedBox(height: 12),
+                  HudPanel(title: 'Ask permission (before deeper review)', children: [
+                    const Text(
+                      'Discover a contact (security.txt / page / support@), '
+                      'generate an email asking Yes/No, and send a link where '
+                      'the site owner accepts terms if they press Yes.',
+                      style: TextStyle(color: Hud.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _busy || _permissionBusy || _crawling
+                              ? null
+                              : _discoverPermissionContacts,
+                          icon: const Icon(Icons.search, size: 16),
+                          label: const Text('Find contacts'),
+                        ),
+                        FilledButton.icon(
+                          onPressed: _busy ||
+                                  _permissionBusy ||
+                                  _crawling ||
+                                  _selectedContact == null
+                              ? null
+                              : _createPermissionInvite,
+                          icon: const Icon(Icons.mail_outline, size: 16),
+                          label: const Text('Ask permission'),
+                        ),
+                        OutlinedButton(
+                          onPressed: _permissionInvite == null || _permissionBusy
+                              ? null
+                              : _openPermissionMailto,
+                          child: const Text('Open mail draft'),
+                        ),
+                        OutlinedButton(
+                          onPressed: _permissionInvite == null || _permissionBusy
+                              ? null
+                              : _copyPermissionDraft,
+                          child: const Text('Copy draft'),
+                        ),
+                        if (_permissionInvite != null)
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse(_permissionInvite!.consentUrl);
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            },
+                            icon: const Icon(Icons.open_in_new, size: 16),
+                            label: const Text('Open Yes/No page'),
+                          ),
+                      ],
+                    ),
+                    if (_permissionContacts.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ..._permissionContacts.take(8).map((c) {
+                        final selected = _selectedContact?.email == c.email;
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            selected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            color: selected ? Hud.gold : Hud.muted,
+                            size: 18,
+                          ),
+                          title: Text(
+                            c.email,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: selected ? Hud.gold : Hud.text,
+                            ),
+                          ),
+                          subtitle: Text(
+                            c.source,
+                            style: const TextStyle(
+                              color: Hud.muted,
+                              fontSize: 11,
+                            ),
+                          ),
+                          onTap: _permissionBusy
+                              ? null
+                              : () => setState(() => _selectedContact = c),
+                        );
+                      }),
+                    ],
+                    if (_permissionInvite != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Invite ${_permissionInvite!.status} · '
+                        '${_permissionInvite!.contactEmail} '
+                        '(${_permissionInvite!.contactSource})',
+                        style: const TextStyle(color: Hud.gold, fontSize: 11),
+                      ),
+                      const SizedBox(height: 4),
+                      SelectableText(
+                        _permissionInvite!.consentUrl,
+                        style: const TextStyle(color: Hud.muted, fontSize: 11),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Terms (owner accepts these when pressing Yes):',
+                        style: TextStyle(color: Hud.muted, fontSize: 11),
+                      ),
+                      Text(
+                        permissionTermsText,
+                        style: const TextStyle(color: Hud.muted, fontSize: 11),
+                      ),
                     ],
                   ]),
                   const SizedBox(height: 12),

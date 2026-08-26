@@ -70,6 +70,7 @@ ENV = SimpleNamespace(
     BLT_API_BASE_URL="http://localhost:8788/v2",
     BLT_API_KEY="",
     NG_BLT_STUB_FALLBACK="true",
+    NG_PUBLIC_BASE_URL=f"http://{HOST}:{PORT}",
 )
 WORKER = BLTWorker(ENV)
 
@@ -169,8 +170,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def _serve_static(self) -> None:
         rel = self.path.split("?")[0].lstrip("/") or "index.html"
-        target = (PUBLIC / rel).resolve()
-        if not str(target).startswith(str(PUBLIC)) or not target.is_file():
+        # Match Worker aliases: /get-client → get-client.html or get-client/index.html
+        candidates = [PUBLIC / rel]
+        if rel.endswith("/"):
+            candidates.append(PUBLIC / rel / "index.html")
+        else:
+            as_dir = PUBLIC / rel
+            if as_dir.is_dir():
+                candidates.append(as_dir / "index.html")
+            if "." not in Path(rel).name:
+                candidates.append(PUBLIC / f"{rel}.html")
+        target = None
+        for cand in candidates:
+            resolved = cand.resolve()
+            if str(resolved).startswith(str(PUBLIC)) and resolved.is_file():
+                target = resolved
+                break
+        if target is None:
             self.send_error(404, "Not found")
             return
         ctype = mimetypes.guess_type(str(target))[0] or "application/octet-stream"

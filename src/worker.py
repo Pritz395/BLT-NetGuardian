@@ -65,6 +65,14 @@ from domain_queue_service import (
     list_domains_for_request,
     submit_domains_for_request,
 )
+from permission_service import (
+    PermissionError,
+    create_invite_for_request,
+    error_body as permission_error_body,
+    get_invite_public,
+    list_invites_for_request,
+    respond_invite_public,
+)
 from ingest_service import ingest_error_response, process_ingest
 from ingest_store import IngestStore
 from install_sh import INSTALL_SH
@@ -169,6 +177,8 @@ class BLTWorker:
                     response = self.json_response(body, status=status)
             elif path == 'api/domains' or path.startswith('api/domains/'):
                 response = await self.handle_domains(request, path)
+            elif path == 'api/permission' or path.startswith('api/permission/'):
+                response = await self.handle_permission(request, path)
             elif path == 'api/findings' or path.startswith('api/findings/'):
                 response = await self.handle_findings(request, path)
             elif path == 'api/auth' or path.startswith('api/auth/'):
@@ -748,6 +758,51 @@ class BLTWorker:
             status, body = domain_error_body(exc)
             return self.json_response(body, status=status)
 
+    async def handle_permission(self, request, path: str = 'api/permission'):
+        """Permission outreach: invite email + public Yes/No terms consent."""
+        subpath = path[len('api/permission'):].lstrip('/')
+        parts = [p for p in subpath.split('/') if p]
+        db = getattr(self.env, 'DB', None)
+        headers = self.get_request_headers(request)
+        try:
+            payload = await self._json_dict(request)
+            if not parts:
+                if request.method == 'GET':
+                    status, body = await list_invites_for_request(
+                        env=self.env,
+                        db=db,
+                        headers=headers,
+                        query_params=self.get_query_params(request),
+                    )
+                    return self.json_response(body, status=status)
+                return self.json_response({'error': 'Method not allowed'}, status=405)
+            if parts == ['invite']:
+                if request.method != 'POST':
+                    return self.json_response({'error': 'Method not allowed'}, status=405)
+                status, body = await create_invite_for_request(
+                    env=self.env,
+                    db=db,
+                    headers=headers,
+                    body=payload,
+                )
+                return self.json_response(body, status=status)
+            if len(parts) >= 2 and parts[0] == 'invite':
+                token = parts[1]
+                if len(parts) == 2 and request.method == 'GET':
+                    status, body = await get_invite_public(db=db, token=token)
+                    return self.json_response(body, status=status)
+                if len(parts) == 3 and parts[2] == 'respond' and request.method == 'POST':
+                    status, body = await respond_invite_public(
+                        db=db,
+                        token=token,
+                        body=payload,
+                    )
+                    return self.json_response(body, status=status)
+            return self.json_response({'error': 'Not found'}, status=404)
+        except (PermissionError, AuthError) as exc:
+            status, body = permission_error_body(exc)
+            return self.json_response(body, status=status)
+
     async def _json_dict(self, request) -> dict:
         raw = await self._read_request_body(request)
         if not raw.strip():
@@ -1172,6 +1227,7 @@ class BLTWorker:
             or path == 'api/detect/headers'
             or path.startswith('api/findings')
             or path.startswith('api/domains')
+            or path.startswith('api/permission')
             or path.startswith('api/auth')
             or path.startswith('api/events')
         ):
