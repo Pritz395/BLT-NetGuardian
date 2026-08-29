@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GSoC 2026 Work Product — BLT-NetGuardian</title>
+  <meta name="description" content="Google Summer of Code 2026 final work product for OWASP BLT NetGuardian by Preetham Poojari.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0d0000; --red:#ff2020; --gold:#c9a227; --muted:#888; --line:#400; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: #eee;
+      font-family: "Share Tech Mono", ui-monospace, monospace;
+      padding: 32px 20px 64px;
+    }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 {
+      font-family: Orbitron, sans-serif; color: var(--red); letter-spacing: 0.14em;
+      font-size: 0.95rem; margin: 0 0 8px;
+    }
+    h2 {
+      font-family: Orbitron, sans-serif; color: var(--gold); letter-spacing: 0.1em;
+      font-size: 0.75rem; margin: 28px 0 12px;
+    }
+    p, li { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    a { color: var(--gold); }
+    .meta { font-size: 12px; margin-bottom: 20px; }
+    .box {
+      border: 1px solid var(--red); padding: 16px 18px; margin: 16px 0 20px;
+    }
+    .box strong { color: #eee; }
+    ul { padding-left: 1.2em; margin: 0 0 12px; }
+    .row { display: grid; gap: 12px; margin: 16px 0 8px; }
+    @media (min-width: 560px) { .row { grid-template-columns: 1fr 1fr; } }
+    a.card {
+      display: block; text-decoration: none; color: inherit;
+      border: 1px solid var(--red); padding: 16px;
+    }
+    a.card:hover { border-color: var(--gold); }
+    a.card strong {
+      font-family: Orbitron, sans-serif; color: var(--gold);
+      letter-spacing: 0.1em; font-size: 11px; display: block; margin-bottom: 8px;
+    }
+    a.card span { color: var(--muted); font-size: 12px; }
+    code { color: var(--gold); font-size: 11px; word-break: break-all; }
+    .nav { font-size: 12px; margin-bottom: 24px; }
+    .nav a { margin-right: 14px; }
+    hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="nav">
+      <a href="/">← Home</a>
+      <a href="/triage">Triage</a>
+      <a href="/get-client">Client</a>
+      <a href="https://gitlab.com/owasp-blt/blt-netguardian">Repo</a>
+    </p>
+
+    <h1>GSOC 2026 WORK PRODUCT</h1>
+    <p class="meta">
+      OWASP Foundation · BLT-NetGuardian<br>
+      Contributor: Preetham Poojari<br>
+      Mentors: Donnie, Carla, Jisan
+    </p>
+
+    <div class="box">
+      <p style="margin:0 0 10px;color:#eee">
+        <strong>Official GSoC work-product page</strong> for this project —
+        final report, archived blog posts, live demo, and source links for evaluators
+        and future reference.
+      </p>
+      <p style="margin:0">
+        Canonical URL (this page):
+        <code>https://blt-netguardian.preethampujari395.workers.dev/gsoc-2026/</code>
+      </p>
+    </div>
+
+    <h2>WHAT NETGUARDIAN IS</h2>
+    <p>
+      BLT-NetGuardian is a signed findings ingest + org triage path for OWASP BLT,
+      with a researcher-operated Flutter client that does distributed domain
+      discovery from page source. The Worker coordinates the queue and stores
+      findings; it does not fetch third-party sites itself.
+    </p>
+    <p>
+      Core path:
+    </p>
+    <p><code>client → signed finding → encrypted storage → triage → BLT issue</code></p>
+    <p>
+      Second-half path:
+    </p>
+    <p><code>seed → leased domain queue → spider hosts → scan on client → Sign &amp; send</code></p>
+
+    <h2>WHAT SHIPPED</h2>
+    <ul>
+      <li>HMAC-signed, replay-protected ingest (<code>ztr-finding-1</code>)</li>
+      <li>AES-256-GCM evidence encryption + redacted decrypt-on-view</li>
+      <li>Org-scoped triage UI (filters, risk sort, audit, CSV/PDF, BLT convert)</li>
+      <li>HTTP header detection + Semgrep-backed findings</li>
+      <li>Flutter client: offline outbox, crawl HUD, shared D1 domain queue</li>
+      <li>Site-owner permission outreach (contact discovery, Yes/No + terms)</li>
+      <li>Staging deploy, local demo server, docs / quickstart</li>
+    </ul>
+
+    <h2>PRIMARY LINKS</h2>
+    <ul>
+      <li><a href="https://gitlab.com/owasp-blt/blt-netguardian">Upstream repository</a></li>
+      <li><a href="https://gitlab.com/owasp-blt/blt-netguardian/-/commits/main">Commit history on main</a></li>
+      <li><a href="https://gitlab.com/owasp-blt/blt-netguardian/-/merge_requests?scope=all&amp;state=merged">Merged merge requests</a></li>
+      <li><a href="https://blt-netguardian.preethampujari395.workers.dev/">Live staging demo</a></li>
+      <li><a href="https://gitlab.com/owasp-blt/blt-netguardian/-/merge_requests/35">Pending MR !35</a> — permission outreach + in-repo final blog (if still open)</li>
+    </ul>
+
+    <h2>ARCHIVED BLOG POSTS</h2>
+    <p>Carla asked to archive the summer write-ups here for the GSoC site list:</p>
+    <div class="row">
+      <a class="card" href="/gsoc-2026/midterm.html">
+        <strong>MIDTERM</strong>
+        <span>Zero-trust triage path — signed ingest, encrypted evidence, convert to BLT issue</span>
+      </a>
+      <a class="card" href="/gsoc-2026/final.html">
+        <strong>FINAL</strong>
+        <span>Full journey — crawl, queue, UX, permission outreach, deployment lessons</span>
+      </a>
+    </div>
+    <p>
+      Markdown sources in the repo:
+      <a href="https://gitlab.com/owasp-blt/blt-netguardian/-/blob/main/docs/midterm-blog-post.md">docs/midterm-blog-post.md</a>
+      ·
+      <a href="https://gitlab.com/owasp-blt/blt-netguardian/-/blob/main/docs/final-blog-post.md">docs/final-blog-post.md</a>
+      (final lands with MR !35 if not yet on main)
+    </p>
+
+    <hr>
+    <p style="font-size:12px">
+      <a href="/">← NetGuardian home</a>
+      · Project under OWASP BLT · Google Summer of Code 2026
+    </p>
+  </main>
+</body>
+</html>

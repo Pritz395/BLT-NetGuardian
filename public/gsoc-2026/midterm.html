@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Midterm Blog — GSoC 2026 BLT-NetGuardian</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0d0000; --red:#ff2020; --gold:#c9a227; --muted:#888; --line:#400; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: #eee;
+      font-family: "Share Tech Mono", ui-monospace, monospace;
+      padding: 32px 20px 64px;
+    }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 {
+      font-family: Orbitron, sans-serif; color: var(--red); letter-spacing: 0.1em;
+      font-size: 0.9rem; margin: 0 0 12px; line-height: 1.4;
+    }
+    h2 {
+      font-family: Orbitron, sans-serif; color: var(--gold); letter-spacing: 0.08em;
+      font-size: 0.72rem; margin: 28px 0 10px;
+    }
+    h3 { color: #eee; font-size: 13px; margin: 18px 0 8px; }
+    p, li { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    a { color: var(--gold); }
+    .meta { font-size: 12px; margin-bottom: 20px; color: var(--muted); }
+    .nav { font-size: 12px; margin-bottom: 24px; }
+    .nav a { margin-right: 14px; }
+    code, pre {
+      color: var(--gold); font-size: 11px; word-break: break-word;
+      background: #1a0000; border: 1px solid var(--line);
+    }
+    code { padding: 1px 4px; }
+    pre { padding: 12px; overflow: auto; line-height: 1.45; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; }
+    th, td { border: 1px solid var(--line); padding: 8px; text-align: left; color: var(--muted); }
+    th { color: var(--gold); }
+    ul { padding-left: 1.2em; }
+    hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0; }
+    .badge {
+      display: inline-block; border: 1px solid var(--gold); color: var(--gold);
+      font-size: 10px; letter-spacing: 0.08em; padding: 4px 8px; margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="nav">
+      <a href="/gsoc-2026/">← GSoC work product</a>
+      <a href="/gsoc-2026/final.html">Final blog</a>
+      <a href="/">Home</a>
+    </p>
+    <p class="badge">ARCHIVED MIDTERM BLOG</p>
+    <h1>Midterm Update: Building a Zero-Trust Triage Path for BLT-NetGuardian</h1>
+    <p class="meta">
+      Google Summer of Code 2026 · OWASP BLT · BLT-NetGuardian<br>
+      Author: Preetham Poojari · July 2026
+    </p>
+
+    <h2>THE PROBLEM WE'RE SOLVING</h2>
+    <p>
+      Security scanners produce findings. Triage teams need to review them, understand
+      the evidence, and turn the important ones into tracked issues — without leaking
+      secrets along the way. In a zero-trust model, that means every finding should arrive
+      <strong style="color:#eee">signed</strong>, be stored
+      <strong style="color:#eee">encrypted</strong>, and only be decrypted
+      <strong style="color:#eee">on authorized view</strong>, with a full audit trail.
+    </p>
+    <p>
+      At the midterm checkpoint, BLT-NetGuardian ran that path end-to-end: from signed
+      ingest through encrypted storage, server-side decrypt, triage, and conversion into
+      a BLT issue.
+    </p>
+
+    <h2>WHAT SHIPPED BY MIDTERM</h2>
+    <h3>1. Signed ingestion (ztr-finding-1)</h3>
+    <p>Findings enter through <code>POST /api/ingest</code> as <code>ztr-finding-1</code> envelopes:</p>
+    <ul>
+      <li><strong style="color:#eee">HMAC-SHA256</strong> signature over canonical JSON</li>
+      <li><strong style="color:#eee">Body digest</strong> (<code>X-BLT-Body-Digest</code>) so the wire payload cannot be tampered with</li>
+      <li><strong style="color:#eee">Nonce + clock skew</strong> checks for replay protection</li>
+      <li>Support for both plaintext mode (dev) and <code>payload_ciphertext</code> (production-shaped)</li>
+    </ul>
+    <p>
+      Ingest rejects bad signatures, digest mismatches, expired timestamps, and replayed
+      nonces with structured error codes — not generic 500s.
+    </p>
+
+    <h3>2. Evidence encryption and decrypt-on-view</h3>
+    <p>
+      Evidence payloads can be stored AES-256-GCM encrypted at rest. On
+      <code>GET /api/findings/{id}</code>:
+    </p>
+    <ol>
+      <li>The server decrypts only for an authorized org token</li>
+      <li>Sensitive keys (<code>password</code>, <code>token</code>, etc.) are redacted before the response leaves the server</li>
+      <li>Access is logged as <code>decrypt_view</code> (plaintext views log as <code>view_detail</code>)</li>
+    </ol>
+    <p>
+      The triage UI shows a badge when evidence was encrypted at rest and successfully
+      decrypted — so analysts can see the cryptographic state, not just the text.
+    </p>
+
+    <h3>3. Triage dashboard</h3>
+    <p>The SPA at <code>/triage.html</code> is wired to the backend:</p>
+    <table>
+      <thead><tr><th>Capability</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Org-scoped findings list</td><td>done</td></tr>
+        <tr><td>Filters (severity, status, CVE, date range)</td><td>done</td></tr>
+        <tr><td>Priority triage queue (open critical/high, no BLT issue)</td><td>done</td></tr>
+        <tr><td>Risk-ranked severity sort</td><td>done</td></tr>
+        <tr><td>Detail panel (evidence / risk / status)</td><td>done</td></tr>
+        <tr><td>Status update via PATCH</td><td>done</td></tr>
+        <tr><td>Convert to Issue via BLT-API</td><td>done</td></tr>
+        <tr><td>CSV export with redaction</td><td>done</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4. BLT-API integration</h3>
+    <p>
+      “Convert to Issue” calls the real BLT-API client. On success, the returned issue ID
+      is stored on the finding and status moves to <code>converted</code>. The operation is
+      idempotent: converting again returns the existing issue instead of creating duplicates.
+    </p>
+
+    <h3>5. Tests and reproducibility</h3>
+    <ul>
+      <li>186 tests passing at midterm</li>
+      <li>Local demo: <code>python local_dev/serve.py</code> → <code>http://localhost:8787/triage.html</code> with token <code>triage-token</code></li>
+      <li>Live-ingest helper: <code>python local_dev/send_finding.py</code></li>
+    </ul>
+
+    <h2>MIDTERM DEMO FLOW</h2>
+    <p>From the proposal:</p>
+    <p><em>signed ingestion → Finding in DB → triage list with filters → server-side decrypt/view evidence → Convert to Issue</em></p>
+    <ol>
+      <li><strong style="color:#eee">Ingest</strong> — seed data or <code>send_finding.py</code> posts a signed envelope</li>
+      <li><strong style="color:#eee">List</strong> — triage UI loads org-scoped findings</li>
+      <li><strong style="color:#eee">Detail</strong> — open encrypted finding; see redacted payload + decrypt badge + audit log</li>
+      <li><strong style="color:#eee">Convert</strong> — BLT-API returns an issue ID; status → <code>converted</code></li>
+      <li><strong style="color:#eee">Export</strong> — CSV with no plaintext secrets</li>
+    </ol>
+
+    <h2>LESSONS LEARNED (MIDTERM)</h2>
+    <ol>
+      <li>Sort by meaning, not alphabet — severity needs an explicit risk rank.</li>
+      <li>One source of truth for API shapes — consolidate finding row mappers.</li>
+      <li>Demo contrast beats demo decoration — show encrypted vs plaintext side by side.</li>
+      <li>Same-origin local dev matters — serve the SPA from the API process.</li>
+    </ol>
+
+    <h2>WHAT WAS NEXT AFTER MIDTERM</h2>
+    <ul>
+      <li>Cloudflare deployment with persistent D1</li>
+      <li>Detection pack (Semgrep + HTTP checks)</li>
+      <li>GitHub OAuth / verified events</li>
+      <li>Flutter client + distributed crawl</li>
+      <li>Pilot polish and documentation</li>
+    </ul>
+    <p>
+      Those items are covered in the
+      <a href="/gsoc-2026/final.html">final blog</a>.
+    </p>
+
+    <hr>
+    <p style="font-size:12px">
+      Source markdown:
+      <a href="https://gitlab.com/owasp-blt/blt-netguardian/-/blob/main/docs/midterm-blog-post.md">docs/midterm-blog-post.md</a>
+      · Midterm MR:
+      <a href="https://gitlab.com/owasp-blt/blt-netguardian/-/merge_requests/12">!12</a>
+      · <a href="/gsoc-2026/">Work product hub</a>
+    </p>
+  </main>
+</body>
+</html>
