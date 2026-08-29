@@ -3,7 +3,7 @@
 **Google Summer of Code 2026 · OWASP BLT · BLT-NetGuardian**  
 **Author:** Preetham Poojari · July 2026
 
-> Archived on the GSoC work-product page: [`/gsoc-2026/midterm.html`](../public/gsoc-2026/midterm.html)
+> Archived on the GSoC work-product page: [gsoc.owaspblt.org/contributors/2026/netguardian/midterm.html](https://gsoc.owaspblt.org/contributors/2026/netguardian/midterm.html)
 
 ---
 

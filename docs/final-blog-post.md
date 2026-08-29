@@ -188,7 +188,7 @@ That is a journey I am genuinely grateful for.
 
 ## Links
 
-- **GSoC 2026 work product page:** [blt-netguardian.preethampujari395.workers.dev/gsoc-2026/](https://blt-netguardian.preethampujari395.workers.dev/gsoc-2026/)
+- **GSoC 2026 work product page:** [gsoc.owaspblt.org/contributors/2026/netguardian/](https://gsoc.owaspblt.org/contributors/2026/netguardian/)
 - **Project repository:** [gitlab.com/owasp-blt/blt-netguardian](https://gitlab.com/owasp-blt/blt-netguardian)
 - **Final crawl synchronization MR:** [OWASP BLT-NetGuardian !34](https://gitlab.com/owasp-blt/blt-netguardian/-/merge_requests/34)
 - **Quickstart:** [`docs/spec/quickstart.md`](spec/quickstart.md)
