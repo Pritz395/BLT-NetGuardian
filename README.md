@@ -1,5 +1,10 @@
 # BLT-NetGuardian
 
+**Google Summer of Code 2026** · OWASP BLT
+
+**GSoC work-product overview:** [gsoc.owaspblt.org/contributors/2026/netguardian/](https://gsoc.owaspblt.org/contributors/2026/netguardian/)  
+(final report + archived midterm/final blogs)
+
 Signed findings ingest + **distributed domain crawl** + org triage + BLT convert, on Cloudflare Workers (D1).
 
 ```
